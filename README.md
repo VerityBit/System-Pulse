@@ -6,3 +6,17 @@ System Pulse is a C project for a microkernel-style Linux resource monitor. It s
 - Pure Function (logic core): only parses strings and computes usage.
 
 Initial focus: /proc filesystem parsing.
+
+## Usage
+
+Default human-readable mode:
+
+```sh
+./system_pulse
+```
+
+JSON output (line-delimited, one sample per interval):
+
+```sh
+./system_pulse --format=json
+```
