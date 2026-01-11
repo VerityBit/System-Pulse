@@ -39,18 +39,26 @@ int main(void) {
     CpuTimes curr = {0};
     MemInfo mem = {0};
     double usage = 0.0;
+    int have_prev = 0;
 
-    if (read_cpu_times(&prev) != 0) {
-        fprintf(stderr, "failed to read /proc/stat\n");
-        return 1;
+    if (read_cpu_times(&prev) == 0) {
+        have_prev = 1;
+    } else {
+        fprintf(stderr, "Warning: failed to read /proc/stat; skipping sample\n");
     }
 
     for (;;) {
         usleep(250000);
 
         if (read_cpu_times(&curr) != 0) {
-            fprintf(stderr, "failed to read /proc/stat\n");
-            return 1;
+            fprintf(stderr, "Warning: failed to read /proc/stat; skipping sample\n");
+            continue;
+        }
+
+        if (!have_prev) {
+            prev = curr;
+            have_prev = 1;
+            continue;
         }
 
         usage = cpu_usage_percent(&prev, &curr);
@@ -65,7 +73,7 @@ int main(void) {
             printf("Buffers: %llu kB\n", mem.buffers_kb);
             printf("Cached: %llu kB\n", mem.cached_kb);
         } else {
-            fprintf(stderr, "failed to read /proc/meminfo\n");
+            fprintf(stderr, "Warning: failed to read /proc/meminfo; skipping sample\n");
         }
 
         fflush(stdout);

@@ -13,16 +13,23 @@ int read_file_to_buffer(const char *path, FileBuffer *out) {
         return -1;
     }
 
+    out->len = 0;
+
     fp = fopen(path, "rb");
     if (!fp) {
         return -1;
     }
 
-    cap = 4096;
-    buf = (char *)malloc(cap);
-    if (!buf) {
-        fclose(fp);
-        return -1;
+    buf = out->data;
+    cap = out->cap;
+
+    if (!buf || cap == 0) {
+        cap = 4096;
+        buf = (char *)malloc(cap);
+        if (!buf) {
+            fclose(fp);
+            return -1;
+        }
     }
 
     for (;;) {
@@ -33,8 +40,9 @@ int read_file_to_buffer(const char *path, FileBuffer *out) {
             size_t new_cap = cap * 2;
             char *tmp = (char *)realloc(buf, new_cap);
             if (!tmp) {
-                free(buf);
                 fclose(fp);
+                out->data = buf;
+                out->cap = cap;
                 return -1;
             }
             buf = tmp;
@@ -50,8 +58,9 @@ int read_file_to_buffer(const char *path, FileBuffer *out) {
                 break;
             }
             if (ferror(fp)) {
-                free(buf);
                 fclose(fp);
+                out->data = buf;
+                out->cap = cap;
                 return -1;
             }
         }
@@ -60,8 +69,9 @@ int read_file_to_buffer(const char *path, FileBuffer *out) {
     if (cap == len) {
         char *tmp = (char *)realloc(buf, cap + 1);
         if (!tmp) {
-            free(buf);
             fclose(fp);
+            out->data = buf;
+            out->cap = cap;
             return -1;
         }
         buf = tmp;
@@ -74,6 +84,7 @@ int read_file_to_buffer(const char *path, FileBuffer *out) {
 
     out->data = buf;
     out->len = len;
+    out->cap = cap;
     return 0;
 }
 
@@ -84,4 +95,5 @@ void free_file_buffer(FileBuffer *buf) {
     free(buf->data);
     buf->data = NULL;
     buf->len = 0;
+    buf->cap = 0;
 }

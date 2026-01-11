@@ -6,6 +6,7 @@
 typedef struct FileBuffer {
     char *data;
     size_t len;
+    size_t cap;
 } FileBuffer;
 
 int read_file_to_buffer(const char *path, FileBuffer *out);
