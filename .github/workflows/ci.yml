@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  test-fast:
+    name: test (${{ matrix.os }}, ${{ matrix.compiler }}, ${{ matrix.opt }})
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+        compiler:
+          - gcc
+          - clang
+        opt:
+          - O2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install clang
+        if: matrix.compiler == 'clang'
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build and test
+        run: |
+          CFLAGS="-std=c11 -Wall -Wextra -Iinclude -${{ matrix.opt }}" \
+          CC="${{ matrix.compiler }}" \
+          make test
+  test-full:
+    name: test (${{ matrix.os }}, ${{ matrix.compiler }}, ${{ matrix.opt }}, ${{ matrix.sanitizer }})
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - ubuntu-24.04-arm64
+        compiler:
+          - gcc
+          - clang
+        opt:
+          - O0
+          - O2
+        sanitizer:
+          - none
+          - asan_ubsan
+        exclude:
+          - os: ubuntu-24.04-arm64
+            sanitizer: asan_ubsan
+          - compiler: clang
+            sanitizer: asan_ubsan
+          - compiler: clang
+            opt: O0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install clang
+        if: matrix.compiler == 'clang'
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build and test
+        run: |
+          if [ "${{ matrix.sanitizer }}" = "asan_ubsan" ]; then
+            SAN_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          else
+            SAN_FLAGS=""
+          fi
+          CFLAGS="-std=c11 -Wall -Wextra -Iinclude -${{ matrix.opt }} $SAN_FLAGS" \
+          CC="${{ matrix.compiler }}" \
+          make test
+  lint:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - name: Run cppcheck
+        run: cppcheck --enable=warning,style,performance,portability --error-exitcode=1 -I include src tests
+  legacy:
+    name: test (ubuntu-20.04, gcc, O2, none)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build and test
+        run: CFLAGS="-std=c11 -Wall -Wextra -Iinclude -O2" CC=gcc make test
+  qemu:
+    name: test (qemu ${{ matrix.arch }})
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - ppc64le
+          - s390x
+          - armhf
+          - riscv64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Run tests in QEMU
+        run: |
+          set -e
+          IMAGE=multiarch/ubuntu-core:${{ matrix.arch }}-focal
+          docker pull $IMAGE
+          docker run --rm -v "$PWD:/work" -w /work $IMAGE \
+            /bin/bash -lc "apt-get update && apt-get install -y make gcc && make test"
