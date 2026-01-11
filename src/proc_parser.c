@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *find_line_prefix(const char *text, const char *prefix) {
@@ -117,6 +118,72 @@ int parse_proc_meminfo(const char *text, MemInfo *out) {
     }
 
     return have_total ? 0 : -1;
+}
+
+int parse_net_dev_line(const char *line, NetDevStats *out) {
+    const char *colon = NULL;
+    const char *name_start = NULL;
+    const char *name_end = NULL;
+    const char *p = NULL;
+    unsigned long long rx_bytes = 0;
+    unsigned long long tx_bytes = 0;
+
+    if (!line || !out) {
+        return -1;
+    }
+
+    colon = strchr(line, ':');
+    if (!colon) {
+        return 0;
+    }
+
+    name_start = line;
+    while (*name_start && isspace((unsigned char)*name_start)) {
+        name_start++;
+    }
+
+    name_end = colon;
+    while (name_end > name_start && isspace((unsigned char)name_end[-1])) {
+        name_end--;
+    }
+
+    if (name_end <= name_start || (size_t)(name_end - name_start) >= sizeof(out->name)) {
+        return -1;
+    }
+
+    memcpy(out->name, name_start, (size_t)(name_end - name_start));
+    out->name[name_end - name_start] = '\0';
+
+    p = colon + 1;
+    for (int field = 0; field < 16; field++) {
+        char *endptr = NULL;
+        unsigned long long value = 0;
+
+        while (*p && isspace((unsigned char)*p)) {
+            p++;
+        }
+
+        if (!*p) {
+            return -1;
+        }
+
+        value = strtoull(p, &endptr, 10);
+        if (endptr == p) {
+            return -1;
+        }
+
+        if (field == 0) {
+            rx_bytes = value;
+        } else if (field == 8) {
+            tx_bytes = value;
+        }
+
+        p = endptr;
+    }
+
+    out->rx_bytes = rx_bytes;
+    out->tx_bytes = tx_bytes;
+    return 1;
 }
 
 double cpu_usage_percent(const CpuTimes *prev, const CpuTimes *curr) {

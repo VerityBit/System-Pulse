@@ -88,6 +88,23 @@ static void test_cpu_usage_percent_zero_delta(void) {
     assert_double_close(usage, 0.0, 0.0001, "cpu usage percent zero delta");
 }
 
+static void test_parse_net_dev_line_valid(void) {
+    const char *line = "  eth0: 123 1 2 3 4 5 6 7 456 8 9 10 11 12 13 14";
+    NetDevStats out = {0};
+
+    assert_true(parse_net_dev_line(line, &out) == 1, "parse_net_dev_line valid input");
+    assert_true(strcmp(out.name, "eth0") == 0, "net dev name parsed");
+    assert_true(out.rx_bytes == 123ULL, "net dev rx bytes parsed");
+    assert_true(out.tx_bytes == 456ULL, "net dev tx bytes parsed");
+}
+
+static void test_parse_net_dev_line_header(void) {
+    const char *line = "Inter-|   Receive                                                |  Transmit";
+    NetDevStats out = {0};
+
+    assert_true(parse_net_dev_line(line, &out) == 0, "parse_net_dev_line header skipped");
+}
+
 int main(void) {
     test_parse_proc_stat_cpu_line_valid();
     test_parse_proc_stat_cpu_line_missing_prefix();
@@ -95,6 +112,8 @@ int main(void) {
     test_parse_proc_meminfo_missing_total();
     test_cpu_usage_percent_basic();
     test_cpu_usage_percent_zero_delta();
+    test_parse_net_dev_line_valid();
+    test_parse_net_dev_line_header();
 
     if (tests_failed != 0) {
         fprintf(stderr, "\n%d/%d tests failed\n", tests_failed, tests_run);

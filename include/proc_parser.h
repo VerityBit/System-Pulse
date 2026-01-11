@@ -22,8 +22,15 @@ typedef struct MemInfo {
     unsigned long long cached_kb;
 } MemInfo;
 
+typedef struct NetDevStats {
+    char name[32];
+    unsigned long long rx_bytes;
+    unsigned long long tx_bytes;
+} NetDevStats;
+
 int parse_proc_stat_cpu_line(const char *text, CpuTimes *out);
 int parse_proc_meminfo(const char *text, MemInfo *out);
+int parse_net_dev_line(const char *line, NetDevStats *out);
 
 double cpu_usage_percent(const CpuTimes *prev, const CpuTimes *curr);
 
